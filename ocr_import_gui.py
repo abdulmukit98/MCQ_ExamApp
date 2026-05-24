@@ -160,7 +160,7 @@ class OCRImporter(QWidget):
         layout.addWidget(QLabel("Preview"))
 
         self.preview_area = QTextEdit()
-        self.preview_area.setReadOnly(True)
+        self.preview_area.setReadOnly(False)
         layout.addWidget(self.preview_area)
 
         # Save Button
@@ -180,15 +180,19 @@ class OCRImporter(QWidget):
         preview = ""
 
         for i, q in enumerate(self.parsed_mcqs):
-            preview += f"\n========== MCQ {i+1} ==========\n"
-            preview += f"{q['question']}\n\n"
+            preview += f"===MCQ===\n"
 
-            preview += f"A) {q['a']}\n"
-            preview += f"B) {q['b']}\n"
-            preview += f"C) {q['c']}\n"
-            preview += f"D) {q['d']}\n"
+            preview += f"QUESTION:\n{q['question']}\n\n"
 
-            preview += f"\nCorrect Answer: {q['answer']}\n"
+            preview += f"A: {q['a']}\n"
+            preview += f"B: {q['b']}\n"
+            preview += f"C: {q['c']}\n"
+            preview += f"D: {q['d']}\n"
+
+            preview += f"ANSWER: {q['answer']}\n"
+
+            preview += f"===END===\n\n"
+
 
         self.preview_area.setText(preview)
 
@@ -199,32 +203,78 @@ class OCRImporter(QWidget):
         )
 
     def save_mcqs(self):
-        if not self.parsed_mcqs:
-            QMessageBox.warning(self, "Error", "No MCQs parsed.")
-            return
+        edited_text = self.preview_area.toPlainText()
+
+        blocks = edited_text.split("===MCQ===")
 
         conn = sqlite3.connect("mcq.db")
         cursor = conn.cursor()
 
-        for q in self.parsed_mcqs:
-            cursor.execute("""
-            INSERT INTO questions (
-                question,
-                option_a,
-                option_b,
-                option_c,
-                option_d,
-                correct_answer
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                q["question"],
-                q["a"],
-                q["b"],
-                q["c"],
-                q["d"],
-                q["answer"]
-            ))
+        saved_count = 0
+
+        for block in blocks:
+
+            block = block.strip()
+
+            if not block:
+                continue
+
+            try:
+                question_match = re.search(
+                    r"QUESTION:\n(.*?)\n\nA:",
+                    block,
+                    re.DOTALL
+                )
+
+                a_match = re.search(r"A:\s*(.*)", block)
+                b_match = re.search(r"B:\s*(.*)", block)
+                c_match = re.search(r"C:\s*(.*)", block)
+                d_match = re.search(r"D:\s*(.*)", block)
+
+                ans_match = re.search(r"ANSWER:\s*([A-D])", block)
+
+                if not all([
+                    question_match,
+                    a_match,
+                    b_match,
+                    c_match,
+                    d_match,
+                    ans_match
+                ]):
+                    continue
+
+                question = question_match.group(1).strip()
+
+                option_a = a_match.group(1).strip()
+                option_b = b_match.group(1).strip()
+                option_c = c_match.group(1).strip()
+                option_d = d_match.group(1).strip()
+
+                answer = ans_match.group(1).strip()
+
+                cursor.execute("""
+                INSERT INTO questions (
+                    question,
+                    option_a,
+                    option_b,
+                    option_c,
+                    option_d,
+                    correct_answer
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    question,
+                    option_a,
+                    option_b,
+                    option_c,
+                    option_d,
+                    answer
+                ))
+
+                saved_count += 1
+
+            except:
+                continue
 
         conn.commit()
         conn.close()
@@ -232,9 +282,8 @@ class OCRImporter(QWidget):
         QMessageBox.information(
             self,
             "Success",
-            f"Saved {len(self.parsed_mcqs)} MCQs to database!"
+            f"Saved {saved_count} MCQs to database!"
         )
-
 
 app = QApplication(sys.argv)
 

@@ -6,14 +6,14 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton,
     QVBoxLayout, QRadioButton, QMessageBox, QButtonGroup
 )
-
+from PyQt6.QtGui import QFont
 
 class ExamApp(QWidget):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("MCQ Exam Mode")
-        self.setGeometry(200, 200, 600, 400)
+        self.setFixedSize(700, 500)
 
         self.layout = QVBoxLayout()
 
@@ -22,6 +22,16 @@ class ExamApp(QWidget):
         self.layout.addWidget(self.start_button)
 
         self.question_label = QLabel("")
+        ###
+        self.font = QFont()
+        self.font.setPointSize(15)
+        ###
+        self.question_label.setWordWrap(True)
+        self.question_label.setFont(self.font)
+        self.question_label.setStyleSheet("""
+            padding: 10px;
+        """)
+
         self.layout.addWidget(self.question_label)
 
         self.options_group = QButtonGroup()
@@ -31,10 +41,26 @@ class ExamApp(QWidget):
         self.option_c = QRadioButton()
         self.option_d = QRadioButton()
 
+        self.option_a.setFont(self.font)
+        self.option_b.setFont(self.font)
+        self.option_c.setFont(self.font)
+        self.option_d.setFont(self.font)
+
+        self.option_a.setStyleSheet("padding: 6px;")
+        self.option_b.setStyleSheet("padding: 6px;")
+        self.option_c.setStyleSheet("padding: 6px;")
+        self.option_d.setStyleSheet("padding: 6px;")
+
+        self.option_a.setMinimumHeight(50)
+        self.option_b.setMinimumHeight(50)
+        self.option_c.setMinimumHeight(50)
+        self.option_d.setMinimumHeight(50)
+
         self.options_group.addButton(self.option_a)
         self.options_group.addButton(self.option_b)
         self.options_group.addButton(self.option_c)
         self.options_group.addButton(self.option_d)
+
 
         self.layout.addWidget(self.option_a)
         self.layout.addWidget(self.option_b)

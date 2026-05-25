@@ -12,16 +12,69 @@ from PyQt6.QtWidgets import (
     QMessageBox
 )
 
-OPTION_PATTERN = r"^\(?([a-dA-D])[\)\.]\s*"
+OPTION_PATTERN = r"^\(?([a-dA-Dকখগঘ])[\)\.।]\s*"
+
+BANGLA_OPTION_MAP = {
+    "ক": "A",
+    "খ": "B",
+    "গ": "C",
+    "ঘ": "D"
+}
 
 def clean_text(text):
     text = re.sub(r"COMPACT IT.*", "", text, flags=re.IGNORECASE)
     text = re.sub(r"Page\s*\d+", "", text, flags=re.IGNORECASE)
     return text
 
+def fix_ocr_errors(text):
+    corrections = {
+        # English option OCR mistakes
+        r"\baj\b": "a)",
+        r"\bbj\b": "b)",
+        r"\bcj\b": "c)",
+        r"\bdj\b": "d)",
+
+        # Parenthesis OCR mistakes
+        r"\(aj": "(a)",
+        r"\(bj": "(b)",
+        r"\(cj": "(c)",
+        r"\(dj": "(d)",
+
+        # Bangla option OCR mistakes
+        r"\(ক\]": "(ক)",
+        r"\(খ\]": "(খ)",
+        r"\(গ\]": "(গ)",
+        r"\(ঘ\]": "(ঘ)",
+
+        # Common answer OCR variants
+        r"উত্তর\s*[।.]": "উত্তর: ",
+        r"Ans\s*[;.]": "Ans: ",
+
+        r"\bAI\b": "A)",
+        r"\bBI\b": "B)",
+        r"\bCI\b": "C)",
+        r"\bDI\b": "D)",
+
+        # Weird OCR spacing
+        # r"\s+": " ",
+    }
+    for pattern, replacement in corrections.items():
+        text = re.sub(pattern, replacement, text)
+
+    # normalize spaces but preserve newlines
+    text = re.sub(r"[ \t]+", " ", text)
+
+    # remove excessive blank lines
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    return text
+
+#   fun fix ocr error
+
 
 def extract_mcqs(text):
     text = clean_text(text)
+    text = fix_ocr_errors(text)
 
     lines = text.split("\n")
 
@@ -34,14 +87,31 @@ def extract_mcqs(text):
         if len(block) < 20:
             return
 
-        ans_match = re.search(r"Ans:\s*([a-dA-D])", block)
+        # ans_match = re.search(r"Ans:\s*([a-dA-D])", block)
+        ans_match = re.search(
+            # r"(Ans|উত্তর)[:।]?\s*([a-dA-Dকখগঘ])",
+            r"(Ans|উত্তর)\s*[:।]?\s*([a-dA-Dকখগঘ])",
+            block,
+            re.IGNORECASE
+        )
 
         if not ans_match:
             return
 
-        answer = ans_match.group(1).upper()
+        # answer = ans_match.group(1).upper()
+        answer_raw = ans_match.group(2)
+        if answer_raw in BANGLA_OPTION_MAP:
+            answer = BANGLA_OPTION_MAP[answer_raw]
+        else:
+            answer = answer_raw.upper()
 
-        block = re.split(r"Ans:\s*[a-dA-D]", block, flags=re.IGNORECASE)[0]
+
+        # block = re.split(r"Ans:\s*[a-dA-D]", block, flags=re.IGNORECASE)[0]
+        block = re.split(
+            r"(Ans|উত্তর)[:।]?\s*[a-dA-Dকখগঘ]",
+            block,
+            flags=re.IGNORECASE
+        )[0]
 
         block_lines = [
             l.strip()
@@ -97,7 +167,13 @@ def extract_mcqs(text):
             if not label_match:
                 continue
 
-            label = label_match.group(1).upper()
+            # label = label_match.group(1).upper()
+            label_raw = label_match.group(1)
+            if label_raw in BANGLA_OPTION_MAP:
+                label = BANGLA_OPTION_MAP[label_raw]
+            else:
+                label = label_raw.upper()
+
 
             opt_text = re.sub(OPTION_PATTERN, "", opt)
 
@@ -125,7 +201,9 @@ def extract_mcqs(text):
         line = line.rstrip()
 
         # Detect ONLY true question start
-        if re.match(r"^\d+\.\s", line):
+        # if re.match(r"^\d+\.\s", line):
+
+        if re.match(r"^[০-৯\d]+\.\s", line):
             flush_block(current_block)
             current_block = [line]
         else:
